@@ -9,7 +9,7 @@ mkdir -p /home/claude/fonts
 cp -n "$R"/fonts/*.ttf /home/claude/fonts/ 2>/dev/null || cp "$R"/fonts/*.ttf /home/claude/fonts/
 cp "$R"/engine/${V}-hud/*.py /home/claude/
 python3 - <<'PY'
-import importlib, sys
+import importlib.util, sys
 missing=[m for m in ("cv2","numpy","PIL") if importlib.util.find_spec(m) is None]
 print("python deps:", "ok" if not missing else "MISSING "+" ".join(missing))
 PY
