@@ -19,10 +19,11 @@ COMMON.update(dict(event='WKF CADET, JUNIOR & U21 WORLD CHAMPIONSHIPS', loc='BIE
 layouts.COMMON = COMMON
 CFG = {
  'leonor_bronze': dict(first='LEONOR ', last='GONÇALVES', hero='BRONZE', cat='JUNIOR -53 KG', key=RED, alt=GREEN,
-                       photo='/home/claude/leo_src.jpg', mask='/home/claude/leo_mask.png', crop=(1130, 1960, 690, 1200),
+                       photo='/home/claude/leo_src.jpg', mask='/home/claude/leo_mask.png', crop=(1040, 1960, 690, 1200),
                        caps='BRONZE', probe='BRONZE'),
 }
-FX_ON = True
+import os
+FX_ON = os.environ.get('SHM_FX', '1') == '1'
 W_FIRST = 'Regular' if FX_ON else 'Light'
 
 # ---------------- FX: glitch (slice displacement + RGB split, scanlines) — graphics & photo only; face protected ----------------
@@ -80,60 +81,68 @@ def story_C(post):
     label_stack(post, 64, 'l')
     logo(post, 84, 284, 250)
     cs = status_block(post, 1016, 300, 'r', t0=2.2)
-    post.athlete(cfg['photo'], cfg['mask'], cfg['crop'], 1.32, 468, 452, (870, 985), reveal=(1.0, 2.5), anchor_face=(0.5, 0.08))
-    add_common_dynamics(post, (104, 700), gauge_t=(1.5, 2.9), ruler=(1004, 410, 560), cellspec=cs, coord_xy=(64, 780))
-    post.mk('ret1', lambda c: c.bracket(700, 436, 26, 'tr', (255, 255, 255, 150), 2), A(1.4, 2.0, 'slide', dx=30, dy=-30))
+    post.athlete(cfg['photo'], cfg['mask'], cfg['crop'], 1.32, 468, 334, (830, 935), reveal=(1.0, 2.5), anchor_face=(0.5, 0.08))
+    add_common_dynamics(post, (104, 700), gauge_t=(1.5, 2.9), ruler=None, cellspec=cs, coord_xy=(64, 780))
+    post.mk('ret1', lambda c: c.bracket(790, 380, 26, 'tr', (255, 255, 255, 150), 2), A(1.4, 2.0, 'slide', dx=30, dy=-30))
     post.mk('ret2', lambda c: c.bracket(180, 900, 26, 'bl', (255, 255, 255, 150), 2), A(1.5, 2.1, 'slide', dx=-30, dy=30))
-    # ---- vertical hero BRONZE, right strip ----
-    fh = T('Black', 150); bb = fh.getbbox(cfg['probe']); wlen = twidth(fh, cfg['hero'], -2); cap = (bb[3] - bb[1]) / S
+    # ---- vertical h2: CAMPEONATO DO MUNDO (gold), right strip ----
+    VWORD = 'CAMPEONATO DO MUNDO'
+    fv, vsz = fit('Black', VWORD, 72, 840, tr=-1); bb = fv.getbbox('CAMPEONATO'); wlen = twidth(fv, VWORD, -1); cap = (bb[3] - bb[1]) / S
     VX1 = 1016; VY1 = 1420; VY0 = VY1 - wlen
     def vword(c):
         im = Image.new('RGBA', (P(wlen + 10), P(cap + 10)), (0, 0, 0, 0)); d = ImageDraw.Draw(im); x = 0
-        for ch in cfg['hero']: d.text((x, -bb[1]), ch, font=fh, fill=BRONZE); x += fh.getlength(ch) - 2 * S
+        for ch in VWORD: d.text((x, -bb[1]), ch, font=fv, fill=GOLD); x += fv.getlength(ch) - 1 * S
         im = im.rotate(90, expand=True); c.img.alpha_composite(im, (P(VX1 - cap - 10), P(VY0)))
     def vword_amb(t):
         sc = 1.0
         for p0 in (6.6, 10.7, 13.5, 16.2):
-            if p0 <= t < p0 + 0.5: sc = 1 + 0.04 * math.sin(math.pi * (t - p0) / 0.5)
+            if p0 <= t < p0 + 0.5: sc = 1 + 0.03 * math.sin(math.pi * (t - p0) / 0.5)
         return 0, 0, 1, sc
-    post.mk('vword', vword, A(2.3, 3.1, 'wipe', dir='bt'), text=True, anchor=(0.5, 0.5), amb=vword_amb)
-    post.flash_t = (2.9, 0.4)
-    post.mk('vrule', lambda c: c.rect(VX1 - cap - 28, VY0, VX1 - cap - 22, VY1, fill=KEY), A(2.6, 3.3, 'wipe', dir='bt'))
+    post.mk('vword', vword, A(3.9, 4.7, 'wipe', dir='bt'), text=True, anchor=(0.5, 0.5), amb=vword_amb)
+    post.mk('vrule', lambda c: c.rect(VX1 - cap - 28, VY0, VX1 - cap - 22, VY1, fill=KEY), A(4.1, 4.8, 'wipe', dir='bt'))
     def vtri(c):
         x = VX1 - cap - 40; h = wlen
         c.rect(x, VY0, x + 4, VY0 + h * 0.40, fill=GREEN); c.rect(x, VY0 + h * 0.40, x + 4, VY0 + h * 0.955, fill=RED); c.rect(x, VY0 + h * 0.955, x + 4, VY0 + h, fill=GOLD)
-    post.mk('vtri', vtri, A(3.0, 3.7, 'wipe', dir='bt'))
-    post.mk('vtag', lambda c: c.text((VX1, VY0 - 34), 'BRONZE // 17.10.2026', T('Medium', 15), GOLD, tr=3, anchor='r'), A(3.6, 4.1), text=True)
-    # hero light sweep along the vertical word (safe: additive band, no displacement)
+    post.mk('vtri', vtri, A(4.4, 5.1, 'wipe', dir='bt'))
+    post.mk('vtag', lambda c: c.text((VX1, VY0 - 34), 'WCH-POL-26 // 17.10.2026', T('Medium', 15), GOLD, tr=3, anchor='r'), A(5.0, 5.5), text=True)
+    # light sweep along the vertical word (additive band, safe on text)
     def sweep(d, t, still):
-        if still or not (3.3 <= t <= 4.1): return
-        o = hud.OS; ph = (t - 3.3) / 0.8; y = VY1 - ph * wlen
+        if still or not (4.9 <= t <= 5.7): return
+        o = hud.OS; ph = (t - 4.9) / 0.8; y = VY1 - ph * wlen
         for k in range(-3, 4):
             d.line([((VX1 - cap - 10) * o, (y + k * 3) * o), (VX1 * o, (y + k * 3 - 40) * o)], fill=(255, 255, 255, int(70 * (1 - abs(k) / 4))), width=max(1, int(2 * o)))
     post.dynamic(sweep)
     XR = VX1 - cap - 64   # right edge of the text column
-    # ---- h2 stack: DISPUTA A / MEDALHA DE / CAMPEONATO DO MUNDO ----
-    post.mk('pre', lambda c: c.text((64, 946), 'DISPUTA A', T('Medium', 34), WHITE, tr=4), A(3.2, 3.7, 'slidewipe', dx=-60, dir='lr'), text=True)
+    # ---- hero stack: DISPUTA A / MEDALHA DE / BRONZE (horizontal, bronze) ----
+    post.mk('pre', lambda c: c.text((64, 896), 'DISPUTA A', T('Bold', 60), WHITE, tr=3), A(2.2, 2.7, 'slidewipe', dx=-60, dir='lr'), text=True)
     fM = T('Black', 88); capM = (fM.getbbox('HEN')[3] - fM.getbbox('HEN')[1]) / S
-    MY = 992; post.letters('med', 64, MY - fM.getbbox('MEDALHA')[1] / S, 'MEDALHA DE', fM, WHITE, t0=3.35, step=0.04, dur=0.45, kind='rise', dy=60)
+    MY = 972; post.letters('med', 64, MY - fM.getbbox('MEDALHA')[1] / S, 'MEDALHA DE', fM, WHITE, t0=2.35, step=0.04, dur=0.45, kind='rise', dy=50)
     mb = MY + capM
-    fC, csz = fit('Black', 'CAMPEONATO DO MUNDO', 88, XR - 64, tr=1); capC = (fC.getbbox('HEN')[3] - fC.getbbox('HEN')[1]) / S
-    CY = mb + 18; post.letters('cdm', 64, CY - fC.getbbox('CAMPEONATO')[1] / S, 'CAMPEONATO DO MUNDO', fC, GOLD, tr=1, t0=3.7, step=0.035, dur=0.45, kind='rise', dy=50)
-    cb = CY + capC
-    post.mk('cline', lambda c: c.rect(64, cb + 16, 64 + twidth(fC, 'CAMPEONATO DO MUNDO', 1), cb + 20, fill=KEY), A(4.3, 4.9, 'wipe', dir='lr'))
+    fh, hsz = fit('Black', cfg['hero'], 150, XR - 64); bbh = fh.getbbox(cfg['probe']); capH = (bbh[3] - bbh[1]) / S
+    HY = mb + 16; hw = post.letters('hero', 64, HY - bbh[1] / S, cfg['hero'], fh, BRONZE, t0=2.7, step=0.05, dur=0.45, kind='rise', dy=60)
+    post.flash_t = (3.2, 0.4); cb = HY + capH
+    post.mk('cline', lambda c: c.rect(64, cb + 16, 64 + hw, cb + 20, fill=KEY), A(3.4, 4.0, 'wipe', dir='lr'))
+    # hero light sweep across BRONZE
+    def hsweep(d, t, still):
+        if still or not (3.3 <= t <= 4.0): return
+        o = hud.OS; ph = (t - 3.3) / 0.7; x = 64 + ph * hw
+        for k in range(-3, 4):
+            d.line([((x + k * 3) * o, HY * o), ((x + k * 3 + 40) * o, cb * o)], fill=(255, 255, 255, int(70 * (1 - abs(k) / 4))), width=max(1, int(2 * o)))
+    post.dynamic(hsweep)
+    csz = vsz
     # ---- date (red) + name (one line) ----
-    fD = T('Bold', 44); DY = cb + 34
+    fD = T('Bold', 40); DY = cb + 30
     post.mk('date', lambda c: c.text((64, DY), COMMON['date'], fD, KEY, tr=2), A(4.5, 5.0, 'slidewipe', dx=-60, dir='lr'), text=True)
     db = DY + (fD.getbbox('HEN')[3]) / S
-    sz = 72
+    sz = 60
     while twidth(T(W_FIRST, sz), cfg['first']) + twidth(T('Black', sz), cfg['last']) > XR - 64: sz -= 1
-    ft1, ft2 = T(W_FIRST, sz), T('Black', sz); TY = db + 16
+    ft1, ft2 = T(W_FIRST, sz), T('Black', sz); TY = db + 12
     w1 = post.letters('t1', 64, TY, cfg['first'], ft1, WHITE, t0=4.8, step=0.04, dur=0.4, kind='rise', dy=40)
     post.letters('t2', 64 + w1, TY, cfg['last'], ft2, KEY, t0=5.0, step=0.04, dur=0.4, kind='rise', dy=40)
     ny = TY + ft2.getbbox('HEN')[3] / S
     post.mk('desc', lambda c: c.text((64, ny + 14), COMMON['desc'], T('Medium', 18), GREY, tr=3), A(5.4, 5.9), text=True)
     # ---- card: event + loc, highlight bar with CATEGORIA tab ----
-    X0, Y0, X1, Y1 = 64, ny + 44, XR, ny + 44 + 160
+    X0, Y0, X1, Y1 = 64, ny + 40, XR, ny + 40 + 156
     def _card(c):
         c.chamfer(X0, Y0, X1, Y1, 26, fill=PANEL + (217,), outline=(255, 255, 255, 38), w=1)
         mid = Y0 + (Y1 - Y0) * 0.45; c.rect(X0, Y0, X0 + 6, mid, fill=KEY); c.rect(X0, mid, X0 + 6, Y1 - 26, fill=ALT)
@@ -169,8 +178,8 @@ def story_C(post):
     fhh = T('SemiBold', 40); hb_ = fhh.getbbox(COMMON['hash'])
     post.mk('hash', lambda c: c.text((1016, base + 6 - hb_[3] / S), COMMON['hash'], fhh, KEY, anchor='r'), A(7.5, 8.1, 'slidewipe', dx=80, dir='rl'), text=True)
     layouts.bottom_decor_story(post, mirror=False)
-    post.notes.append(f'story C: vword 150pt y {VY0:.0f}-{VY1:.0f}, campeonato {csz}pt, name {sz}pt, card y {Y0:.0f}-{Y1:.0f}, selecao baseline y={base:.0f} (<=1600)')
-    make_fx(post, face=(468, 600, 150, 190),
+    post.notes.append(f'story C: bronze {hsz}pt, vertical campeonato {csz}pt y {VY0:.0f}-{VY1:.0f}, name {sz}pt, card y {Y0:.0f}-{Y1:.0f}, selecao baseline y={base:.0f} (<=1600)')
+    if FX_ON: make_fx(post, face=(468, 600, 150, 190),
             zones=[(0, 430), (820, 940), (1000, 1210), (1620, 1900)],
             bursts=[(0.35, 1.0), (2.9, 3.15), (6.6, 6.8), (8.3, 8.5), (10.7, 10.9), (13.5, 13.7), (16.2, 16.4), (18.0, 18.2)],
             still_bands=[(40, 10, 46, 5), (66, 4, -70, 8), (212, 14, -38, 6), (300, 6, 60, 8, 660, 1080), (420, 5, 44, 7, 0, 300), (848, 14, -24, 6), (905, 5, 52, 9), (940, 18, 14, 4),
@@ -187,18 +196,19 @@ def square_C(post):
         post.mk(nm, lambda c, xt=xt, wd=wd, col=col: c.slash(xt, wd, 560, 1180, col, yref=1080), A(st, st + 0.75, 'slide', dx=-sdir[0] * 420, dy=-sdir[1] * 420), amb=sdrift(n, sdir))
     logo(post, 830, 44, 196)
     # hero stack top-left
-    post.mk('pre', lambda c: c.text((56, 58), 'MEDALHA DE', T('Medium', 26), WHITE, tr=4), A(1.2, 1.7, 'slidewipe', dx=-60, dir='lr'), text=True)
-    fh, hsz = fit('Black', cfg['hero'], 150, 640); bb = fh.getbbox(cfg['probe']); HY = 98
+    post.mk('pre', lambda c: c.text((56, 62), 'DISPUTA A', T('Bold', 40), WHITE, tr=2), A(1.0, 1.5, 'slidewipe', dx=-60, dir='lr'), text=True)
+    fM = T('Black', 56); MY = 108; post.letters('med', 56, MY - fM.getbbox('MEDALHA')[1] / S, 'MEDALHA DE', fM, WHITE, t0=1.2, step=0.04, dur=0.4, kind='rise', dy=36)
+    fh, hsz = fit('Black', cfg['hero'], 150, 640); bb = fh.getbbox(cfg['probe']); HY = MY + (fM.getbbox('HEN')[3] - fM.getbbox('HEN')[1]) / S + 14
     hw = post.letters('hero', 56, HY - bb[1] / S, cfg['hero'], fh, BRONZE, t0=1.4, step=0.05, dur=0.45, kind='rise', dy=50)
     hb = HY + (bb[3] - bb[1]) / S; post.flash_t = (1.9, 0.3)
     post.mk('heroline', lambda c: c.rect(56, hb + 14, 56 + hw, hb + 18, fill=KEY), A(1.9, 2.4, 'wipe', dir='lr'))
     fC, csz = fit('Black', 'CAMPEONATO DO MUNDO', 60, 640, tr=1); capC = (fC.getbbox('HEN')[3] - fC.getbbox('HEN')[1]) / S
-    CY = hb + 38; post.letters('cdm', 56, CY - fC.getbbox('CAMPEONATO')[1] / S, 'CAMPEONATO DO MUNDO', fC, GOLD, tr=1, t0=2.0, step=0.035, dur=0.45, kind='rise', dy=40)
+    CY = hb + 34; post.letters('cdm', 56, CY - fC.getbbox('CAMPEONATO')[1] / S, 'CAMPEONATO DO MUNDO', fC, GOLD, tr=1, t0=2.0, step=0.035, dur=0.45, kind='rise', dy=40)
     cb = CY + capC
-    post.mk('sel', lambda c: c.text((56, cb + 24), 'SELEÇÃO NACIONAL PORTUGAL', T('Bold', 28), ALT, tr=2), A(2.5, 3.0, 'slidewipe', dx=-60, dir='lr'), text=True)
-    post.mk('seltri', lambda c: tricolour(c, 56, cb + 64, twidth(T('Bold', 28), 'SELEÇÃO NACIONAL PORTUGAL', 2), 4, anchor='l'), A(2.8, 3.3, 'wipe', dir='lr'))
+    post.mk('sel', lambda c: c.text((56, cb + 20), 'SELEÇÃO NACIONAL PORTUGAL', T('Bold', 26), ALT, tr=2), A(2.5, 3.0, 'slidewipe', dx=-60, dir='lr'), text=True)
+    post.mk('seltri', lambda c: tricolour(c, 56, cb + 58, twidth(T('Bold', 26), 'SELEÇÃO NACIONAL PORTUGAL', 2), 4, anchor='l'), A(2.8, 3.3, 'wipe', dir='lr'))
     # athlete right
-    post.athlete(cfg['photo'], cfg['mask'], cfg['crop'], 0.86, 790, 200, (600, 720), reveal=(1.0, 2.3), anchor_face=(0.5, 0.08), edge_r=0.06)
+    post.athlete(cfg['photo'], cfg['mask'], cfg['crop'], 0.86, 790, 123, (600, 720), reveal=(1.0, 2.3), anchor_face=(0.5, 0.08), edge_r=0.06)
     post.mk('stlab', lambda c: c.text((56, 440), COMMON['status'], T('Medium', 13), GREY, tr=3), A(2.9, 3.4, 'wipe', dir='lr'), text=True)
     add_common_dynamics(post, (120, 600), gauge_t=(1.4, 2.6), ruler=None, cellspec=(56, 466, 8, 'l', 3.2), coord_xy=(230, 540))
     post.mk('ret1', lambda c: c.bracket(1024, 236, 22, 'tr', (255, 255, 255, 150), 2), A(1.5, 2.1, 'slide', dx=30, dy=-30))
@@ -230,7 +240,7 @@ def square_C(post):
     base = layouts.cheer_row(post, Y1 + 16, left='hash', t0=5.0, cheer_sz=62, hash_sz=34, X0=56, X1=1024)
     post.mk('foott', lambda c: c.text((56, 1046), COMMON['foot'], T('Regular', 12), DIM, tr=4), A(5.6, 6.2), text=True)
     post.notes.append(f'square C: hero {hsz}pt, campeonato {csz}pt, name {sz}pt, cheer baseline y={base:.0f}')
-    make_fx(post, face=(790, 300, 120, 140),
+    if FX_ON: make_fx(post, face=(790, 300, 120, 140),
             zones=[(0, 40), (520, 700), (780, 860), (1000, 1080)],
             bursts=[(0.35, 1.0), (1.9, 2.1), (6.6, 6.8), (10.7, 10.9), (14.5, 14.7), (17.8, 18.0)],
             still_bands=[(30, 6, 40, 6, 0, 560), (470, 5, -60, 8, 0, 560), (520, 12, 46, 7, 0, 560), (600, 18, 28, 5), (690, 10, 36, 6), (805, 5, 60, 8), (830, 12, -22, 5), (1000, 6, -40, 7), (1030, 14, 54, 8), (1062, 5, -70, 9), (330, 4, -26, 5, 0, 560)],
