@@ -43,7 +43,7 @@ def MONO(sz, bold=False, sc=None):
         _fcache[key] = ImageFont.truetype(FD + ('GeistMono-Bold.ttf' if bold else 'GeistMono-Regular.ttf'), int(sz * sc))
     return _fcache[key]
 def twidth(font, text, tr=0):
-    return (sum(font.getlength(c) + tr * S for c in text) - tr * S) / S
+    return (sum(font.getlength('L' if c == 'Ł' else c) + tr * S for c in text) - tr * S) / S
 def fit(weight, text, start, maxw, tr=0, floor=10):
     sz = start
     while sz > floor:
@@ -61,7 +61,12 @@ class Ctx:
         x, y = P(xy[0]), P(xy[1]); tr = tr * S; wt = sum(font.getlength(c) + tr for c in t) - tr
         if anchor == 'r': x -= wt
         if anchor == 'c': x -= wt / 2
-        for c in t: s.d.text((x, y), c, font=font, fill=fill); x += font.getlength(c) + tr
+        for c in t:
+            if c == 'Ł':
+                s.d.text((x, y), 'L', font=font, fill=fill); bb = font.getbbox('L'); gw = font.getlength('L'); ch = bb[3] - bb[1]
+                s.d.line([(x + gw * 0.05, y + bb[1] + ch * 0.66), (x + gw * 0.62, y + bb[1] + ch * 0.40)], fill=fill, width=max(1, int(gw * 0.19)))
+            else: s.d.text((x, y), c, font=font, fill=fill)
+            x += font.getlength(c) + tr
         return wt / S
     def ruler(s, x, y, n, step=8, h1=6, h2=12, col=(255, 255, 255, 90), vert=False):
         for i in range(n):
@@ -160,6 +165,7 @@ class Post:
         self.L = {}; self.A = {}; self.order1 = []; self.order2 = []; self.dyn = []; self.notes = []
         self.ath = None
         self.card_rect = None; self.scrim = None
+        self.fx = None        # optional FX pass fn(fr, i, t, still) applied after pass 1, before text
         self.flash_t = None   # (t0, strength) full-frame key-colour flash + micro shake when the hero lands
         self.glows = []
     # --- layer registration ---
@@ -281,7 +287,8 @@ class Post:
             if ph < 1:
                 xs = X0 + ph * (X1 - X0); xs_ = np.arange(int(X0), int(X1)); bnd = np.exp(-((xs_ - xs) / (40.0 * OS)) ** 2).astype(np.float32) * 0.10
                 fr[int(Y0):int(Y1), int(X0):int(X1)] += bnd[None, :, None]
-        # dynamic PIL draws (graphics)
+        if self.fx: fr = self.fx(fr, i, t, still)
+        # dynamic PIL draws (graphics + numeric readouts, after FX so readouts stay legible)
         if self.dyn:
             im = Image.fromarray((np.clip(fr, 0, 1) * 255).astype(np.uint8)).convert('RGBA'); ov = Image.new('RGBA', im.size, (0, 0, 0, 0)); d = ImageDraw.Draw(ov, 'RGBA')
             for fn in self.dyn: fn(d, t, still)
