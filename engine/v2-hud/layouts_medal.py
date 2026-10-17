@@ -97,10 +97,113 @@ def status_block_w(post, x, y, anchor='l', t0=2.2):
     post.mk('sttri', lambda c: tricolour(c, x, y + 62, 260, 3, anchor=anchor), A(t0 + 0.9, t0 + 1.5, 'wipe', dir='lr' if anchor == 'l' else 'rl'))
     return (x, y + 26, 12, anchor, t0)
 
-def hsweep_fn(post, HY, cb, x0, hw, t0=3.3):
+# ---------------- continuous HUD motion (video only; graphics layer, face protected, under text) ----------------
+def add_motion(post, face, zone, ticker_y, waypoints, avoid, seed=11):
+    """face=(cx,cy,rx,ry) 1x ellipse kept clean. zone=(y0,y1) photo zone for the roaming reticle. ticker_y: scrolling strip row.
+    waypoints: reticle lock points (1x). avoid: rect boxes (x0,y0,x1,y1) the drifting markers skip."""
+    W1, H1 = post.W1, post.H1; KEY, ALT = post.KEY, post.ALT
+    rng = np.random.default_rng(seed)
+    TICK = ' · '.join(['MEDALHA DE BRONZE', 'CAMPEONATO DO MUNDO', 'BIELSKO-BIAŁA 2026', 'JUNIOR -53 KG', '3.º LUGAR', 'SELEÇÃO NACIONAL PORTUGAL', '#TEAMSHOMEN']) + ' · '
+    f = T('Medium', 14); tw = twidth(f, TICK, 3)
+    c = Ctx(int(tw + 4), 24); c.text((0, 2), TICK, f, LITE, tr=3); strip = c.layer()
+    markers = [dict(x=float(rng.uniform(40, W1 - 40)), y0=float(rng.uniform(0, H1)), v=float(rng.uniform(16, 40)), ph=float(rng.uniform(0, 6.3)),
+                    kind=int(rng.integers(0, 3)), col=[WHITE, KEY, ALT, GOLD][int(rng.integers(0, 4))], sz=float(rng.uniform(3, 7))) for _ in range(16)]
+    streaks = [dict(off=float(k * 0.8), x=float(rng.uniform(300, W1 + 700)), col=[KEY, ALT, GOLD, WHITE][k % 4], per=float(2.8 + 0.5 * k), ln=float(rng.uniform(260, 520))) for k in range(6)]
+    def motion(fr, i, t, still):
+        if still: return fr
+        o = hud.OS; H, W = fr.shape[:2]
+        ov = Image.new('RGBA', (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(ov, 'RGBA'); Q = lambda v: v * o
+        inface = lambda x, y: ((x - face[0]) / face[2]) ** 2 + ((y - face[1]) / face[3]) ** 2 < 1.0
+        g = ease(t, 0.8, 2.0)
+        # 1. travelling diagonal streaks (dashed, skip the face)
+        for sk in streaks:
+            ph = ((t + sk['off']) % sk['per']) / sk['per']
+            y = H1 + 150 - ph * (H1 + 600); x = sk['x'] - k60 * (H1 - y)   # head of the streak, travelling up-left along the slash axis
+            a = int(230 * g * math.sin(math.pi * ph) ** 0.5)
+            n = int(sk['ln'] / 14)
+            for k in range(n):
+                xa, ya = x + k60 * (k * 14), y + k * 14
+                xb, yb = xa + k60 * 9, ya + 9
+                if inface(xa, ya) or inface(xb, yb) or ya > H1 + 20 or ya < -20: continue
+                aa = int(a * (1 - k / n))
+                d.line([(Q(xa), Q(ya)), (Q(xb), Q(yb))], fill=sk['col'] + (aa,), width=max(1, int(3 * o)))
+        # 2. roaming tracking reticle: eases between waypoints, locks, label
+        seg = 2.4; j = int(t // seg); u = (t % seg) / seg
+        p0 = waypoints[j % len(waypoints)]; p1 = waypoints[(j + 1) % len(waypoints)]
+        e = ease_io(u, 0.0, 0.3)
+        cx, cy = p0[0] + (p1[0] - p0[0]) * e, p0[1] + (p1[1] - p0[1]) * e
+        lock = u > 0.3; sz = 54 + (0 if lock else 26 * (1 - e)); a = int(200 * g)
+        col = (KEY if lock else WHITE)
+        for sx, sy in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+            x0, y0 = cx - sx * sz, cy - sy * sz
+            d.line([(Q(x0), Q(y0)), (Q(x0 + sx * 18), Q(y0))], fill=col + (a,), width=max(1, int(2 * o)))
+            d.line([(Q(x0), Q(y0)), (Q(x0), Q(y0 + sy * 18))], fill=col + (a,), width=max(1, int(2 * o)))
+        if lock:
+            d.ellipse([Q(cx - 3), Q(cy - 3), Q(cx + 3), Q(cy + 3)], fill=GOLD + (a,))
+            lab = f'TRK {j % 7 + 1:02d} // LOCK'; fm = MONO(11, True, sc=o)
+            d.text((Q(cx + sz + 8), Q(cy - sz - 2)), lab, font=fm, fill=WHITE + (a,))
+            d.text((Q(cx + sz + 8), Q(cy - sz + 14)), f'{(0.62 + 0.3 * math.sin(t * 2.3)):.2f} // {int(1000 + t * 37) % 10000:04d}', font=MONO(10, sc=o), fill=LITE + (int(a * 0.8),))
+        # 3. drifting data markers (slow, upward, sparse)
+        for m in markers:
+            y = (m['y0'] - m['v'] * t) % (H1 + 60) - 30; x = m['x'] + 12 * math.sin(t * 0.7 + m['ph'])
+            if inface(x, y) or any(x0 <= x <= x1 and y0 <= y <= y1 for x0, y0, x1, y1 in avoid): continue
+            a = int(120 * g * (0.5 + 0.5 * math.sin(t * 1.3 + m['ph']))); s_ = m['sz']
+            if m['kind'] == 0:
+                d.line([(Q(x - s_), Q(y)), (Q(x + s_), Q(y))], fill=m['col'] + (a,), width=max(1, int(o))); d.line([(Q(x), Q(y - s_)), (Q(x), Q(y + s_))], fill=m['col'] + (a,), width=max(1, int(o)))
+            elif m['kind'] == 1: d.rectangle([Q(x - s_ / 2), Q(y - s_ / 2), Q(x + s_ / 2), Q(y + s_ / 2)], outline=m['col'] + (a,), width=max(1, int(o)))
+            else: d.ellipse([Q(x - 2), Q(y - 2), Q(x + 2), Q(y + 2)], fill=m['col'] + (a,))
+        # 4. edge film-strip ticks scrolling up both sides + a slow bright sweep line bottom->top every 7 s
+        off = (t * 28) % 40
+        for k in range(-1, H1 // 40 + 2):
+            y = k * 40 - off; h = 14 if k % 4 == 0 else 6
+            d.line([(Q(14), Q(y)), (Q(14 + h), Q(y))], fill=(255, 255, 255, int(110 * g))); d.line([(Q(W1 - 14), Q(y)), (Q(W1 - 14 - h), Q(y))], fill=(255, 255, 255, int(110 * g)))
+        ph = ((t + 3.0) % 7.0) / 2.2
+        if ph < 1:
+            y = H1 - ph * (H1 + 40); a = int(90 * math.sin(math.pi * ph))
+            d.line([(Q(0), Q(y)), (Q(W1), Q(y))], fill=(255, 255, 255, a), width=max(1, int(o)))
+            for xk in range(0, W1, 54): d.line([(Q(xk), Q(y)), (Q(xk), Q(y - 8))], fill=(255, 255, 255, a))
+        # 5. timecode + sweep on the ruler
+        d.text((Q(64), Q(404)), f'T+ {int(t // 60):02d}:{t % 60:05.2f}  //  REC', font=MONO(12, True, sc=o), fill=WHITE + (int(220 * g),))
+        if int(t * 2) % 2 == 0: d.ellipse([Q(214), Q(407), Q(222), Q(415)], fill=KEY + (int(255 * g),))
+        # composite (face kept clean)
+        arr = np.array(ov).astype(np.float32) / 255.; al = arr[..., 3:4] * (1 - FACE[..., None])
+        fr[:] = fr * (1 - al) + arr[..., :3] * al
+        # 6. ticker strip (clipped to the column)
+        if strip is not None and g > 0:
+            sw = strip['a'].shape[1]; sh_ = strip['a'].shape[0]; offx = int((t * 70 * o) % sw)
+            X0, X1 = int(64 * o), int((W1 - 64) * o); Y0 = int(ticker_y * o); need = X1 - X0
+            tile = np.concatenate([strip['a']] * (need // sw + 2), axis=1)[:, offx:offx + need]; trgb = np.concatenate([strip['rgb']] * (need // sw + 2), axis=1)[:, offx:offx + need]
+            fade = np.ones(need, np.float32); k = int(60 * o); fade[:k] = np.linspace(0, 1, k); fade[-k:] = np.linspace(1, 0, k)
+            ta = (tile * fade[None, :] * 0.9 * g)[..., None]
+            reg = fr[Y0:Y0 + sh_, X0:X1]; reg[:] = reg * (1 - ta) + trgb * ta
+        return fr
+    yy, xx = np.mgrid[0:H1 * hud.OS, 0:W1 * hud.OS].astype(np.float32)
+    FACE = np.clip(1.5 - np.sqrt(((xx - face[0] * hud.OS) / (face[2] * hud.OS)) ** 2 + ((yy - face[1] * hud.OS) / (face[3] * hud.OS)) ** 2) * 1.5, 0, 1)
+    prev = post.fx
+    post.fx = (lambda fr, i, t, still: motion(prev(fr, i, t, still), i, t, still)) if prev else motion
+
+def bigger_drift(post, names, amp=48, per=5.0, sdir=None):
+    """replace the slashes' ambient drift with a wider, slower travel along their axis + a brief fade-and-reshoot every 9 s"""
+    for n, nm in enumerate(names):
+        if nm not in post.L: continue
+        def amb(t, n=n):
+            ph = ((t + n * 1.1) % 9.0)
+            dsh = 1.0; dd = 0.0
+            if ph < 0.6: dsh = ph / 0.6; dd = (1 - dsh) * 260
+            dr = math.sin(2 * math.pi * t / (per + n * 0.7) + n) * (amp + 10 * n)
+            return sdir[0] * (dr - dd), sdir[1] * (dr - dd), dsh, None
+        post.L[nm]['amb'] = amb
+
+def orbit(post, nm, r=10, per=4.0, ph=0):
+    if nm in post.L: post.L[nm]['amb'] = lambda t: (r * math.cos(2 * math.pi * t / per + ph), r * math.sin(2 * math.pi * t / per + ph), 1, None)
+
+def hsweep_fn(post, HY, cb, x0, hw, t0=3.3, loop=0):
     def hsweep(d, t, still):
-        if still or not (t0 <= t <= t0 + 0.7): return
-        o = hud.OS; ph = (t - t0) / 0.7; x = x0 + ph * hw
+        if still: return
+        tt = t - t0
+        if loop and tt > 0.7: tt = tt % loop
+        if not (0 <= tt <= 0.7): return
+        o = hud.OS; ph = tt / 0.7; x = x0 + ph * hw
         for k in range(-3, 4):
             d.line([((x + k * 3) * o, HY * o), ((x + k * 3 + 40) * o, cb * o)], fill=(255, 255, 255, int(70 * (1 - abs(k) / 4))), width=max(1, int(2 * o)))
     post.dynamic(hsweep)
@@ -131,7 +234,7 @@ def story_W(post):
     HY = mb + 12; hw = post.letters('hero', 64, HY - bbh[1] / S, cfg['hero'], fh, BRONZE, t0=2.7, step=0.05, dur=0.45, kind='rise', dy=60)
     post.flash_t = (3.2, 0.4); cb = HY + capH
     post.mk('cline', lambda c: c.rect(64, cb + 14, 64 + hw, cb + 18, fill=KEY), A(3.4, 4.0, 'wipe', dir='lr'))
-    hsweep_fn(post, HY, cb, 64, hw, 3.3)
+    hsweep_fn(post, HY, cb, 64, hw, 3.3, loop=6.0)
     fC, csz = fit('Black', 'CAMPEONATO DO MUNDO', 60, 952, tr=1); capC = (fC.getbbox('HEN')[3] - fC.getbbox('HEN')[1]) / S
     CY = cb + 24; post.letters('cdm', 64, CY - fC.getbbox('CAMPEONATO')[1] / S, 'CAMPEONATO DO MUNDO', fC, GOLD, tr=1, t0=3.6, step=0.035, dur=0.45, kind='rise', dy=40)
     ccb = CY + capC
@@ -171,6 +274,12 @@ def story_W(post):
     post.mk('hash', lambda c: c.text((1016, bl - hb_[3] / S), COMMON['hash'], fhh, KEY, anchor='r'), A(7.3, 7.9, 'slidewipe', dx=80, dir='rl'), text=True, amb=cheer_amb)
     base = SY + 48
     layouts.bottom_decor_story(post, mirror=True)
+    bigger_drift(post, ('sl1', 'sl2', 'sl3', 'sl4'), amp=48, per=5.0, sdir=np.array([-k60, -1.0]))
+    bigger_drift(post, ('bsl0', 'bsl1', 'bsl2'), amp=36, per=6.0, sdir=np.array([k60, 1.0]))
+    orbit(post, 'ret1', 12, 5.0, 0); orbit(post, 'ret2', 12, 6.0, 2.0)
+    add_motion(post, face=(440, 470, 190, 230), zone=(260, 980), ticker_y=1772,
+               waypoints=[(820, 560), (900, 780), (250, 880), (720, 300), (880, 930), (560, 900), (760, 470), (300, 560)],
+               avoid=[(0, 960, 1080, 1600), (600, 60, 1080, 400), (0, 280, 360, 430)])
     post.notes.append(f'story W-S: hero {hsz}pt, campeonato {csz}pt, name {sz}pt, rows y {RY:.0f}-{RB:.0f}, tricolour y={base:.0f} (<=1600)')
     if FX_ON:
         import layouts_bronze
