@@ -22,6 +22,7 @@ MEDALS = [
 import os
 JOAO = os.environ.get('SHM_JOAO', '1') == '1'
 if JOAO: MEDALS.append(('JOÃO VIEIRA', ('KATA', 'MASCULINO U21'), 'BRONZE', BRONZE, BRONZE_T))
+STORY = os.environ.get('SHM_FMT', 'portrait') == 'story'
 NS = sum(1 for m in MEDALS if m[2] == 'PRATA'); NB = sum(1 for m in MEDALS if m[2] == 'BRONZE'); NT = NS + NB
 COMMON.update(dict(l1='SHM // PORTUGAL MEDAL TABLE', l2='REF. WCH-POL-26 / BIELSKO-BIAŁA', foot='SHOMEN © 2026'))
 layouts.COMMON = COMMON
@@ -39,7 +40,7 @@ def blend(fg, bg, a):
 
 class StaticPost(Post):
     def __init__(self, cfg, fmt):
-        super().__init__(cfg, fmt); self.W1, self.H1 = 1080, 1440
+        super().__init__(cfg, fmt); self.W1, self.H1 = (1080, 1920) if STORY else (1080, 1440)
 
 def tile(c, x0, y0, x1, y1, col, cut=18, fill_a=TINT_A, stroke_a=STROKE_A, corner='tr', w=2):
     """button: rectangle with ONE cut corner, tinted fill, strong stroke"""
@@ -65,7 +66,7 @@ def build():
     # ---- hero (compact) ----
     f1 = T('Black', 88); bb1 = f1.getbbox('PARABÉNS'); cap1 = (bb1[3] - bb1[1]) / S
     f2 = T('Black', 104); bb2 = f2.getbbox('PORTUGAL'); cap2 = (bb2[3] - bb2[1]) / S
-    HY = 262
+    HY = 282 if STORY else 262
     post.mk('h1', lambda c: c.text((64, HY - bb1[1] / S), 'PARABÉNS', f1, WHITE), A(1.4, 1.9), text=True)
     PY = HY + cap1 + 8
     post.mk('h2', lambda c: c.text((64, PY - bb2[1] / S), 'PORTUGAL', f2, KEY), A(1.7, 2.2), text=True)
@@ -74,7 +75,7 @@ def build():
     post.mk('tri', lambda c: tricolour(c, 1016, pb + 30, 238, 4, anchor='r'), A(2.4, 3.0))
     # ---- 2 x 3 grid: silver column left, bronze column right (+ tally tile in the free slot) ----
     TY = pb + 72
-    GAPX, GAPY = 16, 14; CW = (952 - GAPX) // 2; TH = 222
+    GAPX, GAPY = 16, 14; CW = (952 - GAPX) // 2; TH = 198 if STORY else 222
     LX0, RX0 = 64, 64 + CW + GAPX
     post.mk('cols', lambda c: (c.text((LX0, TY), f'PRATA // {NS}', T('Bold', 13), SILVER_T, tr=4), c.rect(LX0, TY + 24, LX0 + CW, TY + 25, fill=SILVER + (120,)),
                                c.text((RX0, TY), f'BRONZE // {NB}', T('Bold', 13), BRONZE_T, tr=4), c.rect(RX0, TY + 24, RX0 + CW, TY + 25, fill=BRONZE + (120,))), A(2.6, 3.1), text=True)
@@ -131,9 +132,8 @@ def build():
             c.text((RX0 + PAD + 146, by + 6), str(NB), T('Black', 22), BRONZE_T); c.text((RX0 + PAD + 168, by + 12), 'BRONZE', T('Bold', 12), BRONZE_T, tr=3)
         post.mk('tally', tally, A(3.8, 4.3), text=True)
     yb = y + 3 * TH + 2 * GAPY
-    bad = [c for c in checks if c[1] > c[2]]
-    post.notes.append('overlap check: ' + ('OK' if not bad else 'FAIL ' + str(bad)))
     GB = yb + 108
+    FY = 1846 if STORY else 1408
     def guides(c):
         for x in (64, 64 + CW, 64 + CW + GAPX, 1016):
             c.line([(x, 232), (x, GB)], (255, 255, 255, 26), 1)
@@ -146,14 +146,38 @@ def build():
     post.mk('sel', lambda c: c.text((64, yb + 34), 'SELEÇÃO NACIONAL PORTUGAL', fS, ALT, tr=2), A(4.8, 5.4), text=True)
     post.mk('seltri', lambda c: tricolour(c, 64, yb + 72, selw, 4, anchor='l'), A(5.2, 5.7))
     post.mk('deco', lambda c: (c.text((1016, yb + 36), f'{NT} MEDALHAS // {NS} PRATA · {NB} BRONZE', T('Bold', 15), GOLD, tr=3, anchor='r'), barcode(c, 1016 - 150, yb + 64, 150, 12, seed=3), c.text((1016, yb + 82), 'ID 26-WCH-POL // PT', MONO(11), DIM + (255,), anchor='r')), A(5.0, 5.6), text=True)
-    post.mk('foott', lambda c: (c.text((1016, 1408), COMMON['foot'], T('Regular', 12), DIM, tr=4, anchor='r'), c.text((64, 1408), 'RESULTADOS // BIELSKO-BIAŁA · 14–18.10.2026', T('Medium', 12), DIM, tr=3)), A(5.6, 6.2), text=True)
+    post.mk('foott', lambda c: (c.text((1016, FY), COMMON['foot'], T('Regular', 12), DIM, tr=4, anchor='r'), c.text((64, FY), 'RESULTADOS // BIELSKO-BIAŁA · 14–18.10.2026', T('Medium', 12), DIM, tr=3)), A(5.6, 6.2), text=True)
+    if STORY:
+        # ---- statement: why we congratulate — short, legible, Pedro's voice ----
+        SX0, SY0, SX1 = 64, yb + 104, 1016
+        L1 = 'HOJE AS MARCAS FICAM À PORTA DO TATAMI.'
+        L2 = 'FICA SÓ PORTUGAL.'
+        fL1, _ = fit('Bold', L1, 40, 952 - 60); fL2, _ = fit('Black', L2, 64, 952 - 60)
+        c1 = (fL1.getbbox('HEN')[3] - fL1.getbbox('HEN')[1]) / S; c2 = (fL2.getbbox('HEN')[3] - fL2.getbbox('HEN')[1]) / S
+        body = ['PARABÉNS AOS MEDALHADOS, A TODOS OS ATLETAS QUE', 'REPRESENTARAM O PAÍS, À EQUIPA TÉCNICA, À COMITIVA,', 'AOS TREINADORES, CLUBES, PATROCINADORES E FAMÍLIAS', 'QUE OS ACOMPANHAM NESTA CAMINHADA.']
+        fB = T('Medium', 21); bh = 29
+        SY1 = SY0 + 26 + c1 + 12 + c2 + 22 + len(body) * bh + 24
+        def statement(c):
+            tile(c, SX0, SY0, SX1, SY1, KEY, cut=22, fill_a=12, stroke_a=170)
+            c.rect(SX0, SY0 + 22, SX0 + 5, SY1, fill=KEY + (255,))
+            c.text((SX0 + 30, SY0 + 26 - fL1.getbbox('H')[1] / S), L1, fL1, WHITE)
+            c.text((SX0 + 30, SY0 + 26 + c1 + 12 - fL2.getbbox('F')[1] / S), L2, fL2, KEY)
+            yy = SY0 + 26 + c1 + 12 + c2 + 22
+            for ln in body:
+                c.text((SX0 + 30, yy), ln, fB, LITE, tr=1); yy += bh
+            c.text((SX1 - 28, SY0 + 12), 'SHM // STATEMENT', MONO(11, True), KEY + (255,), anchor='r')
+        post.mk('statement', statement, A(4.4, 5.0), text=True)
+        for ln in body: checks.append((f'stmt/{ln[:12]}', twidth(fB, ln, 1), 952 - 60))
+        post.notes.append(f'statement y {SY0:.0f}-{SY1:.0f} (<=1600 safe)')
     # ---- glitch: graphics only (pass 1), text drawn after; thin bands + ticks outside text boxes ----
     import layouts_bronze
-    excl = [(64, HY, 1016, pb + 60), (64, TY, 1016, yb + 90), (0, 0, 1080, 230)]      # keep ticks off the hero and the tile text zones
-    layouts_bronze.make_fx(post, face=(-999, -999, 1, 1), zones=[(0, 230), (1340, 1440)], bursts=[],
+    excl = [(64, HY, 1016, pb + 60), (64, TY, 1016, (yb + 90) if not STORY else 1600), (0, 0, 1080, 230)]      # keep ticks off the hero and the tile text zones
+    layouts_bronze.make_fx(post, face=(-999, -999, 1, 1), zones=[(0, 230), (1340, 1440)] if not STORY else [(0, 280), (1620, 1920)], bursts=[],
         still_bands=[(40, 8, 36, 5), (120, 5, -44, 7, 500, 1080), (204, 12, 22, 5, 0, 420), (int(pb) + 24, 4, 60, 8, 0, 520), (int(y) + 140, 3, -30, 6, 0, 1080),
-                     (int(y) + 300, 5, 40, 7, 620, 1080), (int(y) + 452, 3, -26, 5, 0, 640), (int(y) + 560, 4, 34, 6, 300, 1080), (int(yb) + 96, 10, -52, 8, 400, 1080), (1366, 6, -70, 9, 0, 760)],
+                     (int(y) + 300, 5, 40, 7, 620, 1080), (int(y) + 452, 3, -26, 5, 0, 640), (int(y) + 560, 4, 34, 6, 300, 1080), (int(yb) + 96, 10, -52, 8, 400, 1080), (1366, 6, -70, 9, 0, 760)] if not STORY else [(40, 8, 36, 5), (120, 5, -44, 7, 500, 1080), (204, 12, 22, 5, 0, 420), (int(pb) + 24, 4, 60, 8, 0, 520), (1660, 10, -52, 8, 400, 1080), (1720, 6, 40, 7), (1790, 14, -30, 6, 0, 700), (1870, 5, 64, 9)],
         excl=excl)
+    bad = [c for c in checks if c[1] > c[2]]
+    post.notes.append('overlap check: ' + ('OK' if not bad else 'FAIL ' + str(bad)))
     post.notes.append(f'tiles: rows y {y:.0f}-{yb:.0f}; contrast white/silver-tint {contrast(WHITE, blend(SILVER, BG, TINT_A/255)):.1f}:1, '
                       f'silver text {contrast(SILVER_T, blend(SILVER, BG, TINT_A/255)):.1f}:1, bronze text {contrast(BRONZE_T, blend(BRONZE, BG, TINT_A/255)):.1f}:1, '
                       f'bronze text on 22-tint {contrast(BRONZE_T, blend(BRONZE, BG, 22/255)):.1f}:1')
@@ -163,6 +187,6 @@ if __name__ == '__main__':
     hud.OS = 2
     post = build(); post.prep()
     for n in post.notes: print(n, file=sys.stderr)
-    name = f'shomen-portugal-medalhados-worlds2026-tiles-{NT}-glitch'
+    name = f'shomen-portugal-medalhados-worlds2026-tiles-{NT}-' + ('story' if STORY else 'portrait') + '-glitch'
     hud.render(post, name, 'still')
-    Image.open(f'/mnt/user-data/outputs/{name}.png').resize((540, 720), Image.LANCZOS).save(f'/home/claude/qa_tiles{NT}.png')
+    Image.open(f'/mnt/user-data/outputs/{name}.png').resize((540, 960) if STORY else (540, 720), Image.LANCZOS).save(f'/home/claude/qa_tiles{NT}' + ('s' if STORY else '') + '.png')
